@@ -1,5 +1,6 @@
 package com.example.news.web.controller;
 
+import com.example.news.aop.OnlyUser;
 import com.example.news.mapper.CommentMapper;
 import com.example.news.model.Comment;
 import com.example.news.service.CommentService;
@@ -42,12 +43,14 @@ public class CommentController {
     }
 
     @PutMapping("/{id}")
+    @OnlyUser
     public ResponseEntity<CommentResponse> update(@PathVariable Long id, @RequestBody @Valid CommentRequest request) {
         Comment comment = commentService.update(commentMapper.requestToComment(id, request));
         return ResponseEntity.ok(commentMapper.commentToResponse(comment));
     }
 
     @DeleteMapping("/{id}")
+    @OnlyUser
     public ResponseEntity<CommentResponse> delete(@PathVariable Long id) {
         commentService.deleteById(id);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();

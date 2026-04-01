@@ -1,102 +1,125 @@
-# News API: JPA + MapStruct + Spring Security
+# News API с Spring Security & MapStruct
 
-REST API новостного сервиса с CRUD (User/Category/News/Comment), Security (роли USER/ADMIN/MODERATOR), AOP, Specifications, MapStruct, валидацией.
+## Описание
 
----
+Приложение для управления новостями с **полным CRUD**, **Spring Security** (3 роли), **MapStruct** и сложными связями между сущностями.
 
-## Стек технологий 
+В системе есть 4 сущности:
+- **User** — пользователь;
+- **Category** — категория новости;
+- **News** — новость;
+- **Comment** — комментарий.
 
-**Spring Boot 4.0.0** (Java 17)  
-**spring-boot-starter-data-jpa** + **PostgreSQL**  
-**spring-boot-starter-webmvc** + **spring-boot-starter-security**  
-**springdoc-openapi-ui 2.8.8** (Swagger)  
-**MapStruct 1.5.3** + **Lombok**  
-**Validation** + **JsonUnit** (тесты)  
-
----
-
-## API (Swagger: `/swagger-ui.html`)
-
-**База**: `http://localhost:8081`
-
-### Users
-```text
-GET /users ROLE_ADMIN
-GET /users/{id} ROLE_USER/ADMIN/MODERATOR
-POST/PUT/DEL /users/{id} ROLE_USER/ADMIN/MODERATOR
-```
-
-### Categories
-```text
-GET /categories ROLE_USER+
-POST/PUT/DEL /categories/{id} ROLE_ADMIN/MODERATOR
-```
-
-### News
-```text
-GET /news ROLE_USER+
-GET /news/{id} (с комментариями) ROLE_USER+
-POST /news ROLE_USER+
-PUT/DEL /news/{id} @AuthorOnly ROLE_USER+
-```
-
-### Comments
-```text
-GET /news/{id}/comments ROLE_USER+
-POST /news/{id}/comments ROLE_USER+
-PUT/DEL /comments/{id} @AuthorOnly ROLE_USER+
-```
+Связи:
+- User 1:M News 1:M Comment
+- News M:1 Category
+- Comment M:1 News M:1 User
 
 ---
 
-## Ключевые фичи
+## Что умеет приложение
 
-### 1. **Spring Security** (pom.xml)
-spring-boot-starter-security
-
-text
-- JWT аутентификация
-- Роли: `ROLE_USER/ADMIN/MODERATOR`
-- `@PreAuthorize("hasRole('ADMIN')")`
-
-### 2. **MapStruct** (1.5.3 + processor)
-NewsMapper: Entity ↔ DTO
-NewsDto содержит commentsCount (НЕ List<Comment>)
-
-### 3. **PostgreSQL** + JPA
-spring-boot-starter-data-jpa
-postgresql (runtime)
-
-### 4. **Swagger** (2.8.8)
-http://localhost:8080/swagger-ui.html
+- **полный CRUD** для всех 4 сущностей;
+- **роли USER/ADMIN/MODERATOR** с точными правами из SecurityConfig;
+- **AOP** `@AuthorOnly` для News/Comment, `@UserPermission` для User;
+- **специальные методы** поиска комментариев по новости;
+- **автоматический маппинг** через MapStruct.
 
 ---
 
-## Запуск
+## Безопасность (SecurityConfig)
 
-### Локально
+### HTTP Basic + Stateless
+- `.sessionCreationPolicy(SessionCreationPolicy.STATELESS)`
+- `.httpBasic(Customizer.withDefaults())`
+
+### Точные права доступа:
+
+| Эндпоинт | Метод | Роли |
+|----------|-------|------|
+| `/news-service/user` | **GET** | **ADMIN** |
+| `/news-service/user/**` | **GET/PUT/DELETE** | **USER/ADMIN/MOD** |
+| `/news-service/user` | **POST** | **permitAll** |
+| `/news-service/category/**` | **GET** | **USER/ADMIN/MOD** |
+| `/news-service/category/**` | **POST/PUT/DELETE** | **ADMIN/MOD** |
+| `/news-service/news/**` | **ВСЕ** | **USER/ADMIN/MOD** |
+| `/news-service/comment/**` | **ВСЕ** | **USER/ADMIN/MOD** |
+
+**Дополнительно AOP**:
+- `@AuthorOnly` → редактирование своих News/Comment
+- `@UserPermission` → редактирование своего профиля
+
+---
+
+## Эндпоинты
+
+### Users `/news-service/user`
+```http
+GET    /news-service/user           # ADMIN только!
+GET    /news-service/user/{id}      # USER/ADMIN/MOD + @UserPermission
+POST   /news-service/user           # permitAll
+PUT    /news-service/user/{id}      # USER/ADMIN/MOD + @UserPermission
+DELETE /news-service/user/{id}      # USER/ADMIN/MOD + @UserPermission
+```
+
+### Categories `/news-service/category`
+```http
+GET    /news-service/category
+GET    /news-service/category/{id}
+POST   /news-service/category       # ADMIN/MOD
+PUT    /news-service/category/{id}  # ADMIN/MOD
+DELETE /news-service/category/{id}  # ADMIN/MOD
+```
+
+### News `/news-service/news`
+```http
+GET    /news-service/news
+GET    /news-service/news/{id}
+POST   /news-service/news
+PUT    /news-service/news/{id}      # USER/ADMIN/MOD + @AuthorOnly
+DELETE /news-service/news/{id}      # USER/ADMIN/MOD + @AuthorOnly
+```
+
+### Comments `/news-service/comment`
+```http
+GET    /news-service/comment/to-news/{newsId}  # Комменты к новости
+GET    /news-service/comment/{id}
+POST   /news-service/comment
+PUT    /news-service/comment/{id}     # USER/ADMIN/MOD + @AuthorOnly
+DELETE /news-service/comment/{id}     # USER/ADMIN/MOD + @AuthorOnly
+```
+
+---
+
+## DTO & MapStruct
+
+**Все контроллеры используют MapStruct**:
+- `newsMapper.newsListToNews()` → `NewsListResponse`
+- `newsMapper.newsToResponse()` → `NewsResponse`
+- `newsMapper.requestToNews()` → `News entity`
+
+**Аналогично** для `User`/`Category`/`Comment`.
+
+---
+
+### 1. Запуск
 ```bash
-mvn clean compile  # MapStruct генерирует мапперы
-mvn spring-boot:run
+docker-compose up --build
 ```
 
-**Swagger**: `http://localhost:8081/swagger-ui.html`
-
-### PostgreSQL (docker-compose.yml)
-```yaml
-postgres:
-  image: postgres:15
-  environment:
-    POSTGRES_DB: newsdb
-    POSTGRES_USER: user
-    POSTGRES_PASSWORD: pass
-  ports:
-    - "5432:5432"
-```
-
-```bash
-docker-compose up -d 
-mvn spring-boot:run
+### 2. Сервер доступен
+```text
+PostgreSQL: localhost:5432 (newsuser/newspass)
+App: localhost:8081
 ```
 
 ---
+
+## Итог
+
+**Docker Compose** с PostgreSQL + App (8081)  
+**SecurityConfig** с точными ролями  
+**4 контроллера** `/news-service/*`  
+**AOP** `@AuthorOnly` / `@UserPermission`  
+**MapStruct** маппинг  
+**HTTP Basic** аутентификация  

@@ -21,7 +21,7 @@ public interface CommentService {
         Duration duration = Duration.between(currentComment.getUpdatedAt(), now);
 
         if (duration.getSeconds() > 5) {
-            throw new UpdateStateException("Unavailable to update Order!");
+            throw new UpdateStateException("Unavailable to update Comment!");
         }
     }
 }

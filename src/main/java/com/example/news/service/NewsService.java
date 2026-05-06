@@ -24,7 +24,7 @@ public interface NewsService {
         Duration duration = Duration.between(currentNews.getUpdatedAt(), now);
 
         if (duration.getSeconds() > 5) {
-            throw new UpdateStateException("Unavailable to update Order!");
+            throw new UpdateStateException("Unavailable to update News!");
         }
     }
 }

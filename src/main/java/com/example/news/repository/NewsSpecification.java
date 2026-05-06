@@ -34,7 +34,7 @@ public interface NewsSpecification {
         return (root, query, criteriaBuilder) -> {
             if (categoriesIds == null) return null;
 
-            return criteriaBuilder.equal(root.get("categories").get("id"), categoriesIds);
+            return criteriaBuilder.equal(root.in(categoriesIds), categoriesIds);
         };
     }
 }
